@@ -16,7 +16,8 @@ RUN apt-get update > /dev/null && \
     apt-get install -y --no-install-recommends wget ca-certificates xz-utils > /dev/null
 
 # install LLVM
-ARG LLVM_VERSION=21.1.4
+ARG LLVM_VERSION=22.1.8
+ARG CLANG=clang-22
 
 RUN case "$TARGETPLATFORM" in \
       "linux/amd64") LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/LLVM-${LLVM_VERSION}-Linux-X64.tar.xz" ;; \
@@ -32,7 +33,6 @@ RUN mkdir -p $LLVM_STAGE_DIR/bin $LLVM_STAGE_DIR/lib $LLVM_STAGE_DIR/include
 
 # ---- 裁剪llvm ----
 # clang
-ARG CLANG=clang-21
 RUN cp /llvm/bin/$CLANG $LLVM_STAGE_DIR/bin
 RUN find /llvm -type l -exec sh -c '[ "$(readlink -f "$1")" = "/llvm/bin/$CLANG" ]  && echo "$1"' _ {} \; |xargs -I {} cp -P {} $LLVM_STAGE_DIR/bin
 
