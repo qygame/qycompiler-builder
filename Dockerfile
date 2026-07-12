@@ -75,8 +75,8 @@ RUN apt-get update > /dev/null && \
     apt-get install -y --no-install-recommends gdb git >/dev/null && \
     # 减少git提示信息
     git config --global advice.detachedHead false && \
-    # TODO wcq 2025/11/02 后续优化掉 libpq-dev的安装方式
-    apt-get install -y --no-install-recommends libpq-dev=15.14-0+deb12u1 > /dev/null
+    # install libpq-dev
+    apt-get install -y --no-install-recommends libpq-dev > /dev/null
 
 # set ENV
 ENV CXXFLAGS="-stdlib=libc++"
