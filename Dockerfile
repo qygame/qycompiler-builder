@@ -173,3 +173,4 @@ FROM builder-basic
 COPY --from=compiler /usr/local/bin /usr/local/bin
 COPY --from=compiler /usr/local/lib /usr/local/lib
 COPY --from=compiler /usr/local/include /usr/local/include
+COPY --from=compiler /usr/local/share /usr/local/share
