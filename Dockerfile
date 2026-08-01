@@ -54,8 +54,23 @@ RUN find /llvm -name "libunwind.a"   |xargs -I {} cp {} $LLVM_STAGE_DIR/lib
 # compiler-rt && clang lib depence
 RUN cp -R /llvm/lib/clang $LLVM_STAGE_DIR/lib
 
+# tools: llvm-objcopy, llvm-strip: generate debug symbol
+RUN cp \
+    /llvm/bin/llvm-objcopy \
+    /llvm/bin/llvm-strip \
+    $LLVM_STAGE_DIR/bin
+
+# tools: llvm-addr2line, llvm-readelf: debug symbol analysis
+RUN cp \
+    /llvm/bin/llvm-addr2line \
+    /llvm/bin/llvm-readelf \
+    $LLVM_STAGE_DIR/bin
+
 # extra tools: clangd, clang-format
-RUN cp /llvm/bin/clangd /llvm/bin/clang-format $LLVM_STAGE_DIR/bin
+RUN cp \
+    /llvm/bin/clangd \
+    /llvm/bin/clang-format \
+    $LLVM_STAGE_DIR/bin
 
 
 # ---------- 第二阶段：构建最小C++编译环境 ----------
