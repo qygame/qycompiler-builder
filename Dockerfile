@@ -180,6 +180,11 @@ RUN cd /tomlplusplus && $BUILD -DBUILD_SHARED_LIBS=OFF > /dev/null
 RUN cd /tomlplusplus && cmake --build build -j$(nproc) > /dev/null
 RUN cd /tomlplusplus && cmake --install build > /dev/null
 
+# ---- GoogleTest ----
+RUN git clone --branch v1.16.0 --depth 1 https://github.com/google/googletest.git /googletest > /dev/null
+RUN cd /googletest && $BUILD -DBUILD_SHARED_LIBS=OFF -DINSTALL_GTEST=ON > /dev/null
+RUN cd /googletest && cmake --build build -j$(nproc) > /dev/null
+RUN cd /googletest && cmake --install build > /dev/null
 
 # ---------- 第五阶段：发布 ----------
 FROM builder-basic
