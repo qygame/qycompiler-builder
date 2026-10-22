@@ -139,10 +139,10 @@ RUN chmod +x ninja && mv ninja /usr/local/bin
 # CMAKE Command
 ARG BUILD="cmake -S . -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_MESSAGE=NEVER"
 
-# ---- Protobuf ----
+# ---- Protobuf (动态库) ----
 RUN git clone --branch v31.1 --depth 1 https://github.com/protocolbuffers/protobuf.git /protobuf > /dev/null
 RUN cd /protobuf && git submodule update --init --recursive
-RUN cd /protobuf && $BUILD -Dprotobuf_BUILD_SHARED_LIBS=OFF -Dprotobuf_BUILD_TESTS=OFF > /dev/null
+RUN cd /protobuf && $BUILD -Dprotobuf_BUILD_SHARED_LIBS=ON -Dprotobuf_BUILD_TESTS=OFF > /dev/null
 RUN cd /protobuf && cmake --build build -j$(nproc) > /dev/null
 RUN cd /protobuf && cmake --install build > /dev/null
 
