@@ -54,10 +54,11 @@ RUN find /llvm -name "libunwind.a"   |xargs -I {} cp {} $LLVM_STAGE_DIR/lib
 # compiler-rt && clang lib depence
 RUN cp -R /llvm/lib/clang $LLVM_STAGE_DIR/lib
 
-# tools: llvm-objcopy, llvm-strip: generate debug symbol
+# tools: llvm-objcopy, llvm-strip, llvm-objdump: generate debug symbol
 RUN cp \
     /llvm/bin/llvm-objcopy \
     /llvm/bin/llvm-strip \
+    /llvm/bin/llvm-objdump \
     $LLVM_STAGE_DIR/bin
 
 # tools: llvm-addr2line, llvm-readelf: debug symbol analysis
@@ -86,6 +87,8 @@ RUN apt-get update > /dev/null && \
     apt-get install -y --no-install-recommends libxml2 > /dev/null && \
     # install libc
     apt-get install -y --no-install-recommends libc6-dev > /dev/null && \
+    # install uuid (qykernel, qyserver 需要)
+    apt-get install -y --no-install-recommends uuid-dev > /dev/null && \
     # extra tools: gtd, git  TODO wcq 2025/11/02 后续使用lldb代替gdb
     apt-get install -y --no-install-recommends gdb git >/dev/null && \
     # 减少git提示信息
@@ -194,3 +197,13 @@ COPY --from=compiler /usr/local/bin /usr/local/bin
 COPY --from=compiler /usr/local/lib /usr/local/lib
 COPY --from=compiler /usr/local/include /usr/local/include
 COPY --from=compiler /usr/local/share /usr/local/share
+
+RUN apt-get update > /dev/null && \
+    apt-get install -y --no-install-recommends ca-certificates wget > /dev/null && \
+    install -m 0755 -d /etc/apt/keyrings && \
+    wget -qO /etc/apt/keyrings/docker.asc https://download.docker.com/linux/debian/gpg && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $(. /etc/os-release && echo ${VERSION_CODENAME}) stable" > /etc/apt/sources.list.d/docker.list && \
+    apt-get update > /dev/null && \
+    apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin > /dev/null && \
+    rm -rf /var/lib/apt/lists/*
