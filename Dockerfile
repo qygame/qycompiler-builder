@@ -173,9 +173,10 @@ RUN cd /rpp && $BUILD -DREDIS_PLUS_PLUS_BUILD_SHARED=OFF -DREDIS_PLUS_PLUS_BUILD
 RUN cd /rpp && cmake --build build -j$(nproc) > /dev/null
 RUN cd /rpp && cmake --install build > /dev/null
 
-# ---- asio (header only) ----
-RUN git clone --branch asio-1-34-2 --depth 1 https://github.com/chriskohlhoff/asio.git /asio > /dev/null
-RUN cd /asio/asio && cp include/asio.hpp /usr/local/include && cp -r include/asio /usr/local/include
+# ---- boost (header only) ----
+RUN wget https://archives.boost.io/release/1.92.0/source/boost_1_92_0.tar.gz -O /tmp/boost.tar.gz >/dev/null
+RUN tar -zxf /tmp/boost.tar.gz -C /tmp >/dev/null
+RUN cp -r /tmp/boost_*/boost /usr/local/include/
 
 # ---- tomlplusplus ----
 RUN git clone --branch v3.4.0 --depth 1 https://github.com/marzer/tomlplusplus.git /tomlplusplus > /dev/null
