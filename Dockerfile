@@ -1,115 +1,39 @@
-# ---------- 第一阶段：裁剪llvm ----------
-# 裁剪llvm:
-# 1. clang, clang++ (instead of gcc, g++)
-# 2. lld, llvm-ar (instead of ld, ar)
-# 3. libc++ (instead of libstdc++)
-# 4. libc++abi, libunwind, compiler-rt (instead of libgcc_s, libgcc)
-# 5. extra tools: clangd, clang-format
-
+# ---------- 第一阶段：下载llvm ----------
 FROM debian:12 AS llvm
-
 # Dockerfile(BuildKit)内置参数
 ARG TARGETPLATFORM
-
 # install package: wget, tar(xz)
 RUN apt-get update > /dev/null && \
     apt-get install -y --no-install-recommends wget ca-certificates xz-utils > /dev/null
 
-# install LLVM
 ARG LLVM_VERSION=22.1.8
-ARG CLANG=clang-22
-
 RUN case "$TARGETPLATFORM" in \
       "linux/amd64") LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/LLVM-${LLVM_VERSION}-Linux-X64.tar.xz" ;; \
       "linux/arm64") LLVM_URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VERSION}/LLVM-${LLVM_VERSION}-Linux-ARM64.tar.xz" ;; \
       *) echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
     esac && \
-    wget -q "$LLVM_URL" -O llvm.tar.xz
-RUN mkdir -p /llvm && tar -xvf llvm.tar.xz -C /llvm --strip-components=1 >/dev/null
-
-# stage dir
-ARG LLVM_STAGE_DIR=/stage
-RUN mkdir -p $LLVM_STAGE_DIR/bin $LLVM_STAGE_DIR/lib $LLVM_STAGE_DIR/include
-
-# ---- 裁剪llvm ----
-# clang
-RUN cp /llvm/bin/$CLANG $LLVM_STAGE_DIR/bin
-RUN find /llvm -type l -exec sh -c '[ "$(readlink -f "$1")" = "/llvm/bin/$CLANG" ]  && echo "$1"' _ {} \; |xargs -I {} cp -P {} $LLVM_STAGE_DIR/bin
-
-# lld, llvm-ar
-RUN cp /llvm/bin/lld /llvm/bin/llvm-ar $LLVM_STAGE_DIR/bin
-RUN find /llvm -type l -exec sh -c '[ "$(readlink -f "$1")" = "/llvm/bin/lld" ]     && echo "$1"' _ {} \; |xargs -I {} cp -P {} $LLVM_STAGE_DIR/bin
-
-RUN find /llvm -type l -exec sh -c '[ "$(readlink -f "$1")" = "/llvm/bin/llvm-ar" ] && echo "$1"' _ {} \; |xargs -I {} cp -P {} $LLVM_STAGE_DIR/bin
-
-# libc++
-RUN find /llvm -name "libc++.a"      |xargs -I {} cp {} $LLVM_STAGE_DIR/lib
-RUN cp -R /llvm/include/c++ $LLVM_STAGE_DIR/include
-RUN find /llvm -name "__config_site" |xargs -I {} cp {} $LLVM_STAGE_DIR/include
-
-# libunwind, libc++abi
-RUN find /llvm -name "libc++abi.a"   |xargs -I {} cp {} $LLVM_STAGE_DIR/lib
-RUN find /llvm -name "libunwind.a"   |xargs -I {} cp {} $LLVM_STAGE_DIR/lib
-
-# compiler-rt && clang lib depence
-RUN cp -R /llvm/lib/clang $LLVM_STAGE_DIR/lib
-
-# tools: llvm-objcopy, llvm-strip, llvm-objdump: generate debug symbol
-RUN cp \
-    /llvm/bin/llvm-objcopy \
-    /llvm/bin/llvm-strip \
-    /llvm/bin/llvm-objdump \
-    $LLVM_STAGE_DIR/bin
-
-# tools: llvm-addr2line, llvm-readelf: debug symbol analysis
-RUN cp \
-    /llvm/bin/llvm-addr2line \
-    /llvm/bin/llvm-readelf \
-    $LLVM_STAGE_DIR/bin
-
-# extra tools: clangd, clang-format
-RUN cp \
-    /llvm/bin/clangd \
-    /llvm/bin/clang-format \
-    $LLVM_STAGE_DIR/bin
-
+    wget -q "$LLVM_URL" -O /tmp/llvm.tar.xz && \
+    mkdir -p /opt/llvm && \
+    tar -xJf /tmp/llvm.tar.xz -C /opt/llvm --strip-components=1 && \
+    rm /tmp/llvm.tar.xz
 
 # ---------- 第二阶段：构建最小C++编译环境 ----------
 FROM debian:12 AS builder-basic
-
-# clang
-COPY --from=llvm /stage/bin /usr/bin
-COPY --from=llvm /stage/lib /usr/lib
-COPY --from=llvm /stage/include /usr/include
-
-RUN apt-get update > /dev/null && \
-    # fix lld
-    apt-get install -y --no-install-recommends libxml2 > /dev/null && \
-    # install libc
-    apt-get install -y --no-install-recommends libc6-dev > /dev/null && \
-    # install uuid (qykernel, qyserver 需要)
-    apt-get install -y --no-install-recommends uuid-dev > /dev/null && \
-    # extra tools: gtd, git  TODO wcq 2025/11/02 后续使用lldb代替gdb
-    apt-get install -y --no-install-recommends gdb git >/dev/null && \
-    # 减少git提示信息
-    git config --global advice.detachedHead false && \
-    # install libpq-dev
-    apt-get install -y --no-install-recommends libpq-dev > /dev/null
-
+COPY --from=llvm /opt/llvm/ /usr/local/
+# libxml2: fix lld;
+# uuid-dev: used by qykernel/qyserver
+RUN apt-get update >/dev/null && \
+    apt-get install -y --no-install-recommends libxml2 libc6-dev uuid-dev libpq-dev git > /dev/null && \
+    git config --global advice.detachedHead false
 # set ENV
 ENV CXXFLAGS="-stdlib=libc++"
 ENV LDFLAGS="-fuse-ld=lld -lc++abi -rtlib=compiler-rt -lunwind"
-
 
 # ---------- 第三阶段：构建编译环境 ----------
 # 编译结果放在/usr/local中
 
 FROM builder-basic AS compiler
-
-# Dockerfile(BuildKit)内置参数
 ARG TARGETPLATFORM
-
-# 编译阶段临时需要的工具
 RUN apt-get install -y --no-install-recommends wget ca-certificates unzip > /dev/null
 
 # ---- CMake ----
