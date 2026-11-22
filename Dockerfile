@@ -4,7 +4,7 @@
 # 2. lld, llvm-ar (instead of ld, ar)
 # 3. libc++ (instead of libstdc++)
 # 4. libc++abi, libunwind, compiler-rt (instead of libgcc_s, libgcc)
-# 5. extra tools: clangd, clang-format
+# 5. extra tools: clangd, clang-format, llvm-cov, lldb
 
 FROM debian:12 AS llvm
 
@@ -73,6 +73,14 @@ RUN cp \
     /llvm/bin/clang-format \
     $LLVM_STAGE_DIR/bin
 
+# extra tools: llvm-cov (coverage report)
+RUN cp /llvm/bin/llvm-cov $LLVM_STAGE_DIR/bin
+RUN cp /llvm/bin/llvm-profdata $LLVM_STAGE_DIR/bin
+
+# extra tools: lldb
+RUN cp /llvm/bin/lldb $LLVM_STAGE_DIR/bin
+RUN cp /llvm/bin/lldb-server $LLVM_STAGE_DIR/bin
+RUN find /llvm -name "liblldb.so*" -exec cp -P {} $LLVM_STAGE_DIR/lib \;
 
 # ---------- 第二阶段：构建最小C++编译环境 ----------
 FROM debian:12 AS builder-basic
@@ -85,12 +93,14 @@ COPY --from=llvm /stage/include /usr/include
 RUN apt-get update > /dev/null && \
     # fix lld
     apt-get install -y --no-install-recommends libxml2 > /dev/null && \
+    # fix lldb
+    apt-get install -y --no-install-recommends libncurses6 libpython3.11 libedit2 > /dev/null && \
     # install libc
     apt-get install -y --no-install-recommends libc6-dev > /dev/null && \
     # install uuid (qykernel, qyserver 需要)
     apt-get install -y --no-install-recommends uuid-dev > /dev/null && \
-    # extra tools: gtd, git  TODO wcq 2025/11/02 后续使用lldb代替gdb
-    apt-get install -y --no-install-recommends gdb git >/dev/null && \
+    # extra tools: git
+    apt-get install -y --no-install-recommends git >/dev/null && \
     # 减少git提示信息
     git config --global advice.detachedHead false && \
     # install libpq-dev
